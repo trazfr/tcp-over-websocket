@@ -102,6 +102,6 @@ func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	promTotalConnections.WithLabelValues("tcp").Inc()
 	log.Printf("%s - Connected to TCP: %s", r.RemoteAddr, ws.connectTCP)
-	NewBidirConnection(tcpConn, httpConn).Run()
+	NewBidirConnection(tcpConn, httpConn, 0).Run()
 	log.Printf("%s - Client disconnected", r.RemoteAddr)
 }

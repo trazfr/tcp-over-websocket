@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,15 +16,17 @@ import (
 
 // bidirConnection implements the Runner interface
 type bidirConnection struct {
-	tcpConn net.Conn
-	wsConn  *websocket.Conn
+	tcpConn        net.Conn
+	wsConn         *websocket.Conn
+	tcpReadTimeout time.Duration
 }
 
 // NewBidirConnection to create an object to transfer data between the TCP socket and web connection in bidirectional way
-func NewBidirConnection(tcpConn net.Conn, wsConn *websocket.Conn) Runner {
+func NewBidirConnection(tcpConn net.Conn, wsConn *websocket.Conn, tcpReadTimeout time.Duration) Runner {
 	return &bidirConnection{
-		tcpConn: tcpConn,
-		wsConn:  wsConn,
+		tcpConn:        tcpConn,
+		wsConn:         wsConn,
+		tcpReadTimeout: tcpReadTimeout,
 	}
 }
 
@@ -31,8 +34,11 @@ func (b *bidirConnection) sendTCPToWS() {
 	defer b.close()
 	data := make([]byte, BufferSize)
 	for {
+		if b.tcpReadTimeout > 0 {
+			b.tcpConn.SetReadDeadline(time.Now().Add(b.tcpReadTimeout))
+		}
 		readSize, err := b.tcpConn.Read(data)
-		if err != nil {
+		if err != nil && !os.IsTimeout(err) {
 			if err != io.EOF {
 				log.Printf("TCPToWS - Error while reading from TCP: %s", err)
 			}

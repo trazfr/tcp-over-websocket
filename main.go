@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 )
 
@@ -16,8 +15,8 @@ func globalUsage() {
 	fmt.Fprintln(os.Stderr, " - client: TCP server which connects to a websocket server")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example: connect to ssh-server through an HTTP proxy running on ws-server")
-	fmt.Fprintln(os.Stderr, "-", os.Args[0], "-listen_ws :8080 -remote_tcp ssh-server.example.org:22")
-	fmt.Fprintln(os.Stderr, "-", os.Args[0], "-listen_tcp 127.0.0.1:1234 -remote_ws ws://ws-server.example.org:8080/")
+	fmt.Fprintln(os.Stderr, "-", os.Args[0], "server -listen_ws :8080 -connect_tcp ssh-server.example.org:22")
+	fmt.Fprintln(os.Stderr, "-", os.Args[0], "client -listen_tcp 127.0.0.1:1234 -connect_ws ws://ws-server.example.org:8080/")
 	os.Exit(1)
 }
 
@@ -59,14 +58,7 @@ func createHTTPClient(args []string) Runner {
 		os.Exit(1)
 	}
 
-	connectURL, err := url.Parse(connect)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: could not parse the -connect_ws argument: %s", err)
-		fs.Usage()
-		os.Exit(1)
-	}
-
-	return NewHTTPClient(listen, connectURL)
+	return NewHTTPClient(listen, connect)
 }
 
 func create() Runner {
