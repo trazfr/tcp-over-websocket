@@ -44,7 +44,7 @@ func (h *httpClient) Run() error {
 		}
 
 		wsConn, err := h.createWsConnection(tcpConn.RemoteAddr().String())
-		if err != nil {
+		if err != nil || wsConn == nil {
 			log.Printf("%s - Error while dialing %s: %s", tcpConn.RemoteAddr(), h.connectWS, err)
 			tcpConn.Close()
 			continue
@@ -81,11 +81,14 @@ func (h *httpClient) createWsConnection(remoteAddr string) (wsConn *websocket.Co
 		log.Printf("%s - Connecting to %s", remoteAddr, wsURL)
 		var httpResponse *http.Response
 		wsConn, httpResponse, err = websocket.DefaultDialer.Dial(wsURL, nil)
-		if httpResponse != nil && (httpResponse.StatusCode == 301 || httpResponse.StatusCode == 307) {
-			url = httpResponse.Header.Get("Location")
-			log.Printf("%s - Redirect to %s", remoteAddr, url)
-		} else {
-			return
+		if httpResponse != nil {
+			switch httpResponse.StatusCode {
+			case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+				url = httpResponse.Header.Get("Location")
+				log.Printf("%s - Redirect to %s", remoteAddr, url)
+				continue
+			}
 		}
+		return
 	}
 }
