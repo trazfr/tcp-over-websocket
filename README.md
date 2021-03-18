@@ -12,8 +12,7 @@ purpose as this program is intended to be run behind a reverse proxy.
 ## Install
 Having a working [Golang](https://golang.org/) environment:
 ```
-go get github.com/trazfr/tcp-over-websocket
-go install github.com/trazfr/tcp-over-websocket
+go install github.com/trazfr/tcp-over-websocket@latest
 ```
 
 ## Use
