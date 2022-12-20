@@ -6,31 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-const (
-	promSubSystem = "http_to_tcp"
-)
-
-var (
-	promTotalConnections = promauto.NewCounterVec(prometheus.CounterOpts{
-		Subsystem: promSubSystem,
-		Name:      "connections",
-		Help:      "The total number of connections open",
-	}, []string{"type"})
-	promActiveConnections = promauto.NewGauge(prometheus.GaugeOpts{
-		Subsystem: promSubSystem,
-		Name:      "active_connections",
-		Help:      "The total number of active connections",
-	})
-	promErrors = promauto.NewCounterVec(prometheus.CounterOpts{
-		Subsystem: promSubSystem,
-		Name:      "error",
-		Help:      "The total number of errors",
-	}, []string{"type"})
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +35,6 @@ func NewHTTPServer(listenHTTP, connectTCP string) Runner {
 	}
 
 	result.httpMux.Handle("/", &result.wsHandler)
-	result.httpMux.Handle("/metrics", promhttp.Handler())
 	return result
 }
 
@@ -80,27 +54,21 @@ type wsHandler struct {
 }
 
 func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	promActiveConnections.Inc()
-	defer promActiveConnections.Dec()
 
 	httpConn, err := ws.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		promErrors.WithLabelValues("upgrade").Inc()
 		log.Printf("%s - Error while upgrading: %s", r.RemoteAddr, err)
 		return
 	}
-	promTotalConnections.WithLabelValues("http").Inc()
 	log.Printf("%s - Client connected", r.RemoteAddr)
 
 	tcpConn, err := net.Dial("tcp", ws.connectTCP)
 	if err != nil {
-		promErrors.WithLabelValues("dial_tcp").Inc()
 		httpConn.Close()
 		log.Printf("%s - Error while dialing %s: %s", r.RemoteAddr, ws.connectTCP, err)
 		return
 	}
 
-	promTotalConnections.WithLabelValues("tcp").Inc()
 	log.Printf("%s - Connected to TCP: %s", r.RemoteAddr, ws.connectTCP)
 	NewBidirConnection(tcpConn, httpConn, 0).Run()
 	log.Printf("%s - Client disconnected", r.RemoteAddr)
