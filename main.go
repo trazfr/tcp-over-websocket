@@ -42,6 +42,7 @@ func createHTTPServer(args []string) Runner {
 
 func createHTTPClient(args []string) Runner {
 	listen, connect := "", ""
+	insecure := false
 
 	fs := flag.NewFlagSet("client", flag.ExitOnError)
 	fs.StringVar(&listen, "listen_tcp", "",
@@ -51,6 +52,8 @@ func createHTTPClient(args []string) Runner {
 		"Remote websocket to connect to at each incoming TCP connection \n"+
 			"Examples: \"ws://192.168.0.1:8080/\", \"wss://https.example.org/\", \"ws://[::1]/\"\n"+
 			"If the server is behind a reverse proxy, it may be something like: \"wss://https.example.org/fragment/\"")
+	fs.BoolVar(&insecure, "insecure", false,
+		"skip certificate and hostname verification \nExample: true, false")
 	fs.Parse(args)
 
 	if listen == "" || connect == "" {
@@ -58,7 +61,7 @@ func createHTTPClient(args []string) Runner {
 		os.Exit(1)
 	}
 
-	return NewHTTPClient(listen, connect)
+	return NewHTTPClient(listen, connect, insecure)
 }
 
 func create() Runner {
