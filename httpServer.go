@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,7 +47,7 @@ type httpServer struct {
 }
 
 // NewHTTPServer creates a new websocket server which will wait for clients and open TCP connections
-func NewHTTPServer(listenHTTP, connectTCP string) Runner {
+func NewHTTPServer(listenHTTP, connectTCP string, realIPHeader string) Runner {
 	result := &httpServer{
 		wsHandler: wsHandler{
 			connectTCP: connectTCP,
@@ -54,6 +56,7 @@ func NewHTTPServer(listenHTTP, connectTCP string) Runner {
 				WriteBufferSize: BufferSize,
 				CheckOrigin:     func(r *http.Request) bool { return true },
 			},
+			realIPHeader: realIPHeader,
 		},
 		listenHTTP: listenHTTP,
 		httpMux:    &http.ServeMux{},
@@ -75,33 +78,49 @@ func (h *httpServer) Run() error {
 
 // wsHandler implements the http.Handler interface
 type wsHandler struct {
-	connectTCP string
-	wsUpgrader websocket.Upgrader
+	connectTCP   string
+	wsUpgrader   websocket.Upgrader
+	realIPHeader string
 }
 
 func (ws *wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	promActiveConnections.Inc()
 	defer promActiveConnections.Dec()
+	remoteAddr := r.RemoteAddr
+	if len(ws.realIPHeader) > 0 {
+		data := r.Header.Get(ws.realIPHeader)
+		if parsedIP := net.ParseIP(data); parsedIP != nil {
+			remotePort := ""
+			if portData := strings.Split(r.RemoteAddr, ":"); len(portData) == 2 {
+				remotePort = portData[1]
+			} else {
+				log.Printf("failed to parse remote port in \"%s\"", r.RemoteAddr)
+			}
+			remoteAddr = fmt.Sprintf("%s:%s", data, remotePort)
+		} else {
+			log.Printf("failed to parse data \"%s\" in real ip header %s", data, ws.realIPHeader)
+		}
+	}
 
 	httpConn, err := ws.wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		promErrors.WithLabelValues("upgrade").Inc()
-		log.Printf("%s - Error while upgrading: %s", r.RemoteAddr, err)
+		log.Printf("%s - Error while upgrading: %s", remoteAddr, err)
 		return
 	}
 	promTotalConnections.WithLabelValues("http").Inc()
-	log.Printf("%s - Client connected", r.RemoteAddr)
+	log.Printf("%s - Client connected", remoteAddr)
 
 	tcpConn, err := net.Dial("tcp", ws.connectTCP)
 	if err != nil {
 		promErrors.WithLabelValues("dial_tcp").Inc()
 		httpConn.Close()
-		log.Printf("%s - Error while dialing %s: %s", r.RemoteAddr, ws.connectTCP, err)
+		log.Printf("%s - Error while dialing %s: %s", remoteAddr, ws.connectTCP, err)
 		return
 	}
 
 	promTotalConnections.WithLabelValues("tcp").Inc()
-	log.Printf("%s - Connected to TCP: %s", r.RemoteAddr, ws.connectTCP)
+	log.Printf("%s - Connected to TCP: %s", remoteAddr, ws.connectTCP)
 	NewBidirConnection(tcpConn, httpConn, 0).Run()
-	log.Printf("%s - Client disconnected", r.RemoteAddr)
+	log.Printf("%s - Client disconnected", remoteAddr)
 }

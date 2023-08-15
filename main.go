@@ -11,7 +11,7 @@ func globalUsage() {
 	fmt.Fprintln(os.Stderr, os.Args[0], "<type> [arguments]")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "type:")
-	fmt.Fprintln(os.Stderr, " - server: HTTP websocket server which connectes to a TCP server")
+	fmt.Fprintln(os.Stderr, " - server: HTTP websocket server which connects to a TCP server")
 	fmt.Fprintln(os.Stderr, " - client: TCP server which connects to a websocket server")
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example: connect to ssh-server through an HTTP proxy running on ws-server")
@@ -21,7 +21,7 @@ func globalUsage() {
 }
 
 func createHTTPServer(args []string) Runner {
-	listen, connect := "", ""
+	listen, connect, realIPHeader := "", "", ""
 
 	fs := flag.NewFlagSet("server", flag.ExitOnError)
 	fs.StringVar(&listen, "listen_ws", "",
@@ -30,6 +30,9 @@ func createHTTPServer(args []string) Runner {
 	fs.StringVar(&connect, "connect_tcp", "",
 		"Remote address to connect to at each incoming websocket connection\n"+
 			"Examples: \"127.0.0.1:23\", \"ssh.example.com:22\", \"[::1]:143\"")
+	fs.StringVar(&realIPHeader, "real_ip_header", "",
+		"Header name to read real ip from\n"+
+			"Examples: \"X-Real-Ip\", \"X-Forwarded-For")
 	fs.Parse(args)
 
 	if listen == "" || connect == "" {
@@ -37,7 +40,7 @@ func createHTTPServer(args []string) Runner {
 		os.Exit(1)
 	}
 
-	return NewHTTPServer(listen, connect)
+	return NewHTTPServer(listen, connect, realIPHeader)
 }
 
 func createHTTPClient(args []string) Runner {
