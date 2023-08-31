@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"log"
 	"net"
 	"net/http"
@@ -21,7 +22,10 @@ type httpClient struct {
 }
 
 // NewHTTPClient creates a new TCP server which connects tunnels to an HTTP server
-func NewHTTPClient(listenTCP, connectWS string) Runner {
+func NewHTTPClient(listenTCP, connectWS string, insecure bool) Runner {
+	if insecure {
+		websocket.DefaultDialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	return &httpClient{
 		connectWS: connectWS,
 		listenTCP: listenTCP,
